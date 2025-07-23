@@ -1,4 +1,4 @@
-.. image:: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml/badge.svg?branch=master
+.. image:: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml/badge.svg?branch=main
    :target: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml
    :alt: Test Status
 
@@ -7,7 +7,7 @@
    :alt: Python Versions
 
 .. image:: https://img.shields.io/github/license/abdulsamet/logmancer.svg
-   :target: https://github.com/abdulsamet/logmancer/blob/master/LICENSE
+   :target: https://github.com/abdulsamet/logmancer/blob/main/LICENSE
    :alt: License
 
 Logmancer
