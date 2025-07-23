@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# migrations
+migrations/
+
+# example_project
+example_project/
+
+# test files
+.tox/
+pytest.ini
+
+# sqlite database
+*.sqlite3
+*.db
+
+# cache files
+.benchmarks/
+.pytest_cache/
+.ruff_cache/
+.vscode/
+
+# coverage reports
+.coverage
+htmlcov/
+.coverage.*
+*.cover
