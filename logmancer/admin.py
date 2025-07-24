@@ -28,7 +28,13 @@ class LogEntryAdmin(admin.ModelAdmin):
         "status_code",
         "short_message",
     )
-    list_filter = ("level", "status_code", "actor_type", "source")
+    list_filter = (
+        "level",
+        "status_code",
+        "actor_type",
+        "source",
+        "user",
+    )
     search_fields = ("message", "path", "meta")
     ordering = ("-timestamp",)
     readonly_fields = (

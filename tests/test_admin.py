@@ -84,7 +84,7 @@ class TestLogEntryAdmin:
 
     def test_list_filter(self):
         """Test admin list filter fields"""
-        expected_filters = ("level", "status_code", "actor_type", "source")
+        expected_filters = ("level", "status_code", "actor_type", "source", "user")
         assert self.admin.list_filter == expected_filters
 
     def test_search_fields(self):
