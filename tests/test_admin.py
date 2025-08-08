@@ -1,38 +1,15 @@
-import pytest
-import uuid
+from django.contrib import admin
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
-from django.contrib import admin
-from django.test import RequestFactory, TestCase, Client, override_settings
-from django.urls import reverse, path
+from django.test import Client, RequestFactory, TestCase, override_settings
+from django.urls import path, reverse
 from django.utils import timezone
 
-from logmancer.admin import LogEntryAdmin, LEVEL_COLORS
+import pytest
+from model_bakery import baker
+
+from logmancer.admin import LEVEL_COLORS, LogEntryAdmin
 from logmancer.models import LogEntry
-
-
-def create_unique_user(username_prefix="testuser", **kwargs):
-    """Helper function to create unique users"""
-    unique_id = str(uuid.uuid4())[:8]
-    username = f"{username_prefix}_{unique_id}"
-    email = kwargs.pop("email", f"{username}@example.com")
-    password = kwargs.pop("password", "testpass123")
-
-    return User.objects.create_user(
-        username=username, email=email, password=password, **kwargs
-    )
-
-
-def create_unique_superuser(username_prefix="admin", **kwargs):
-    """Helper function to create unique superusers"""
-    unique_id = str(uuid.uuid4())[:8]
-    username = f"{username_prefix}_{unique_id}"
-    email = kwargs.pop("email", f"{username}@example.com")
-    password = kwargs.pop("password", "adminpass123")
-
-    return User.objects.create_superuser(
-        username=username, email=email, password=password, **kwargs
-    )
 
 
 @pytest.mark.django_db
@@ -46,7 +23,7 @@ class TestLogEntryAdmin:
         self.admin = LogEntryAdmin(LogEntry, self.site)
 
         # Create test user with unique username
-        self.user = create_unique_user("testuser")
+        self.user = baker.make(User, username="testuser", password="testpass123")
 
         # Create test log entry
         self.log_entry = LogEntry.objects.create(
@@ -135,16 +112,11 @@ class TestLogEntryAdmin:
 
     def test_colored_level_error(self):
         """Test colored_level display method for ERROR level"""
-        error_log = LogEntry.objects.create(
-            level="ERROR", message="Error message", source="test"
-        )
+        error_log = LogEntry.objects.create(level="ERROR", message="Error message", source="test")
 
         result = self.admin.colored_level(error_log)
         expected_color = LEVEL_COLORS["ERROR"]
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">ERROR</b>'
-            == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">ERROR</b>' == result
 
     def test_colored_level_warning(self):
         """Test colored_level display method for WARNING level"""
@@ -154,23 +126,15 @@ class TestLogEntryAdmin:
 
         result = self.admin.colored_level(warning_log)
         expected_color = LEVEL_COLORS["WARNING"]
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">WARNING</b>'
-            == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">WARNING</b>' == result
 
     def test_colored_level_debug(self):
         """Test colored_level display method for DEBUG level"""
-        debug_log = LogEntry.objects.create(
-            level="DEBUG", message="Debug message", source="test"
-        )
+        debug_log = LogEntry.objects.create(level="DEBUG", message="Debug message", source="test")
 
         result = self.admin.colored_level(debug_log)
         expected_color = LEVEL_COLORS["DEBUG"]
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">DEBUG</b>'
-            == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">DEBUG</b>' == result
 
     def test_colored_level_critical(self):
         """Test colored_level display method for CRITICAL level"""
@@ -180,10 +144,7 @@ class TestLogEntryAdmin:
 
         result = self.admin.colored_level(critical_log)
         expected_color = LEVEL_COLORS["CRITICAL"]
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">CRITICAL</b>'
-            == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">CRITICAL</b>' == result
 
     def test_colored_level_unknown(self):
         """Test colored_level display method for unknown level"""
@@ -193,22 +154,15 @@ class TestLogEntryAdmin:
 
         result = self.admin.colored_level(unknown_log)
         expected_color = LEVEL_COLORS["DEFAULT"]
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">UNKNOWN</b>'
-            == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">UNKNOWN</b>' == result
 
     def test_colored_level_case_insensitive(self):
         """Test colored_level works with different cases"""
-        lower_log = LogEntry.objects.create(
-            level="info", message="Lowercase level", source="test"
-        )
+        lower_log = LogEntry.objects.create(level="info", message="Lowercase level", source="test")
 
         result = self.admin.colored_level(lower_log)
         expected_color = LEVEL_COLORS["INFO"]  # Should use uppercase key
-        assert (
-            f'<b style="color: {expected_color}; font-weight: bold;">info</b>' == result
-        )
+        assert f'<b style="color: {expected_color}; font-weight: bold;">info</b>' == result
 
     def test_colored_level_short_description(self):
         """Test colored_level short description"""
@@ -224,9 +178,7 @@ class TestLogEntryAdmin:
     def test_short_message_long(self):
         """Test short_message display method for long message"""
         long_message = "A" * 100  # 100 character message
-        long_log = LogEntry.objects.create(
-            level="INFO", message=long_message, source="test"
-        )
+        long_log = LogEntry.objects.create(level="INFO", message=long_message, source="test")
 
         result = self.admin.short_message(long_log)
 
@@ -238,9 +190,7 @@ class TestLogEntryAdmin:
     def test_short_message_exactly_60_chars(self):
         """Test short_message with exactly 60 character message"""
         exact_message = "A" * 60
-        exact_log = LogEntry.objects.create(
-            level="INFO", message=exact_message, source="test"
-        )
+        exact_log = LogEntry.objects.create(level="INFO", message=exact_message, source="test")
 
         result = self.admin.short_message(exact_log)
 
@@ -274,39 +224,6 @@ test_admin_urlpatterns = [
 
 @override_settings(
     ROOT_URLCONF="tests.test_admin",
-    INSTALLED_APPS=[
-        "django.contrib.admin",
-        "django.contrib.auth",
-        "django.contrib.contenttypes",
-        "django.contrib.sessions",
-        "django.contrib.messages",
-        "logmancer",
-    ],
-    MIDDLEWARE=[
-        "django.middleware.security.SecurityMiddleware",
-        "django.contrib.sessions.middleware.SessionMiddleware",
-        "django.middleware.common.CommonMiddleware",
-        "django.middleware.csrf.CsrfViewMiddleware",
-        "django.contrib.auth.middleware.AuthenticationMiddleware",
-        "django.contrib.messages.middleware.MessageMiddleware",
-    ],
-    SECRET_KEY="test-secret-key-for-testing-only",
-    USE_TZ=True,
-    TEMPLATES=[
-        {
-            "BACKEND": "django.template.backends.django.DjangoTemplates",
-            "DIRS": [],
-            "APP_DIRS": True,
-            "OPTIONS": {
-                "context_processors": [
-                    "django.template.context_processors.debug",
-                    "django.template.context_processors.request",
-                    "django.contrib.auth.context_processors.auth",
-                    "django.contrib.messages.context_processors.messages",
-                ],
-            },
-        },
-    ],
 )
 class TestLogEntryAdminIntegration(TestCase):
     """Integration tests for LogEntryAdmin with Django admin"""
@@ -314,10 +231,12 @@ class TestLogEntryAdminIntegration(TestCase):
     def setUp(self):
         """Set up test data"""
         # Create superuser for admin access with unique username
-        self.admin_user = create_unique_superuser("admin")
+        self.admin_user = baker.make(
+            User, username="admin", password="adminpass123", is_superuser=True, is_staff=True
+        )
 
         # Create regular user with unique username
-        self.user = create_unique_user("testuser")
+        self.user = baker.make(User, username="testuser", password="testpass123")
 
         # Create test log entries
         self.log_entries = [
@@ -456,6 +375,7 @@ class TestLogEntryAdminIntegration(TestCase):
     def test_admin_no_add_permission(self):
         """Test that add permission is handled correctly"""
         from django.contrib import admin
+
         from logmancer.models import LogEntry
 
         admin_instance = admin.site._registry[LogEntry]
@@ -471,6 +391,7 @@ class TestLogEntryAdminIntegration(TestCase):
     def test_admin_no_delete_permission(self):
         """Test that delete permission is handled correctly"""
         from django.contrib import admin
+
         from logmancer.models import LogEntry
 
         admin_instance = admin.site._registry[LogEntry]
@@ -573,7 +494,10 @@ class TestAdminCustomization:
         admin_instance = LogEntryAdmin(LogEntry, AdminSite())
 
         request = RequestFactory().get("/")
-        request.user = create_unique_superuser("testadmin")
+        # request.user = create_unique_superuser("testadmin")
+        request.user = baker.make(
+            User, username="testadmin", password="adminpass123", is_superuser=True, is_staff=True
+        )
 
         actions = admin_instance.get_actions(request)
         assert isinstance(actions, dict)

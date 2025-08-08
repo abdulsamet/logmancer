@@ -7,6 +7,4 @@ class LogmancerConfig(AppConfig):
     verbose_name = "Logmancer - Magical Logging for Django"
 
     def ready(self):
-        from logmancer.signals import connect_signals
-
-        connect_signals()
+        import logmancer.signals  # noqa: F401

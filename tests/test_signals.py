@@ -1,124 +1,80 @@
 from unittest.mock import patch
 
-from django.contrib.auth.models import Group
-from django.test import override_settings
+from django.contrib.auth.models import Group, User
 
 import pytest
+from model_bakery import baker
 
-from logmancer.models import LogEntry
-from logmancer.signals import connect_signals
+from logmancer.signals import log_model_delete, log_model_save
 
 
 @pytest.mark.django_db
 class TestSignals:
-    """Test Django signals integration with pytest"""
+    """Test Django signals integration"""
 
-    @override_settings(LOGMANCER={"ENABLE_SIGNALS": True})
-    @patch("logmancer.utils.transaction.on_commit")
-    def test_signal_model_created(self, mock_on_commit, simple_user_factory):
-        """Test signal fires when model is created"""
+    @patch("logmancer.signals.get_bool", return_value=True)
+    @patch("logmancer.signals.LogEvent.info")
+    def test_signal_handler_for_create(self, mock_log_info, mock_get_bool):
+        """Test signal handler function directly for create"""
+        user = User(username="testuser")
+        user.pk = 40  # Simulate a primary key for the instance
 
-        # Mock on_commit to execute immediately
-        def execute_immediately(func):
-            func()
+        log_model_save(sender=User, instance=user, created=True)
 
-        mock_on_commit.side_effect = execute_immediately
+        # Verify LogEvent.info was called exactly once
+        mock_log_info.assert_called_once()
 
-        # Connect signals
-        connect_signals()
+        # Get call arguments
+        args, kwargs = mock_log_info.call_args
 
-        initial_count = LogEntry.objects.count()
+        # Check message - either in args[0] or kwargs['message']
+        message = args[0] if args else kwargs.get("message", "")
+        assert "created" in message
 
-        # Create a User instance to trigger the signal
-        simple_user_factory()
+        # Additional checks
+        assert kwargs.get("source") == "signal"
+        assert kwargs.get("actor_type") == "system"
 
-        # Check if log was created
-        new_log_count = LogEntry.objects.count()
-        assert new_log_count >= initial_count
+    @patch("logmancer.signals.get_bool", return_value=True)
+    @patch("logmancer.signals.LogEvent.warning")
+    def test_signal_handler_for_delete(self, mock_log_warning, mock_get_bool):
+        """Test signal handler function directly for delete"""
+        user = baker.make(User, username="testuser")
 
-    @override_settings(
-        LOGMANCER={"ENABLE_SIGNALS": True, "EXCLUDE_MODELS": ["auth.Group"]}
-    )
-    @patch("logmancer.utils.transaction.on_commit")
-    def test_signal_excluded_model_created(self, mock_on_commit):
-        """Test signal does not fire for excluded models"""
-        connect_signals()
+        log_model_delete(sender=User, instance=user)
 
-        initial_count = LogEntry.objects.filter(source="signal").count()
+        # Verify LogEvent.warning was called exactly once
+        assert mock_log_warning.call_count == 1
 
-        # Create a Group instance which should be excluded
-        Group.objects.create(name="Excluded Group")
+        # Check if call_args exists and has the expected structure
+        assert mock_log_warning.call_args is not None
+        args, kwargs = mock_log_warning.call_args
 
-        new_count = LogEntry.objects.filter(source="signal").count()
-        assert new_count == initial_count
+        # Verify the message contains "deleted"
+        if args:
+            assert "deleted" in args[0]
+        else:
+            assert "deleted" in kwargs.get("message", "")
 
-    @override_settings(LOGMANCER={"ENABLE_SIGNALS": True})
-    @patch("logmancer.utils.transaction.on_commit")
-    def test_signal_model_updated(self, mock_on_commit, simple_user_factory):
-        """Test signal fires when model is updated"""
+    @patch("logmancer.signals.get_bool", return_value=True)
+    @patch("logmancer.signals.should_exclude_model", return_value=True)
+    @patch("logmancer.signals.LogEvent.info")
+    def test_excluded_model_handler(self, mock_log_info, mock_should_exclude, mock_get_bool):
+        """Test signal handler respects excluded models"""
+        group = Group.objects.create(name="test")
 
-        # Mock on_commit to execute immediately
-        def execute_immediately(func):
-            func()
+        log_model_save(sender=Group, instance=group, created=True)
 
-        mock_on_commit.side_effect = execute_immediately
+        # Should not call LogEvent.info for excluded model
+        assert not mock_log_info.called
 
-        # Connect signals
-        connect_signals()
+    @patch("logmancer.signals.get_bool", return_value=False)
+    @patch("logmancer.signals.LogEvent.info")
+    def test_disabled_signals_handler(self, mock_log_info, mock_get_bool):
+        """Test signal handler respects disabled setting"""
+        user = baker.make(User, username="testuser")
 
-        # Create and update a User instance
-        test_user = simple_user_factory()
-        initial_signal_count = LogEntry.objects.filter(source="signal").count()
+        log_model_save(sender=User, instance=user, created=True)
 
-        test_user.email = "updated@example.com"
-        test_user.save()
-
-        # Check if update log was created
-        new_signal_count = LogEntry.objects.filter(source="signal").count()
-        assert new_signal_count >= initial_signal_count
-
-    @override_settings(LOGMANCER={"ENABLE_SIGNALS": False})
-    def test_signals_disabled(self):
-        """Test signals don't fire when disabled"""
-        connect_signals()
-
-        initial_count = LogEntry.objects.filter(source="signal").count()
-        Group.objects.create(name="Should not log")
-
-        new_count = LogEntry.objects.filter(source="signal").count()
-        assert new_count == initial_count
-
-
-@pytest.mark.django_db
-def test_user_factory_fixture_usage(simple_user_factory):
-    """Test user_factory fixture specifically"""
-    # Test default user creation
-    user = simple_user_factory(username="testuser", email="test@example.com")
-    assert user.username == "testuser"
-    assert user.email == "test@example.com"
-
-    # Test custom user creation
-    custom_user = simple_user_factory(username="custom", email="custom@example.com")
-    assert custom_user.username == "custom"
-    assert custom_user.email == "custom@example.com"
-
-    # Test uniqueness
-    assert user.id != custom_user.id
-
-
-@pytest.mark.django_db
-def test_log_entry_factory_fixture_usage(simple_log_entry_factory):
-    """Test log_entry_factory fixture specifically"""
-    # Test default log entry creation
-    log = simple_log_entry_factory()
-    assert log.message is not None
-    assert log.level == "INFO"
-    assert log.source == "test"
-
-    # Test custom log entry creation
-    custom_log = simple_log_entry_factory(
-        message="Custom message", level="ERROR", source="custom"
-    )
-    assert custom_log.message == "Custom message"
-    assert custom_log.level == "ERROR"
-    assert custom_log.source == "custom"
+        # Should not call LogEvent.info when disabled
+        assert not mock_log_info.called

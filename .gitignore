@@ -32,5 +32,6 @@ pytest.ini
 # coverage reports
 .coverage
 htmlcov/
-.coverage.*
+coverage.xml
+.coverage*
 *.cover

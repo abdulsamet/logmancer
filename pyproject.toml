@@ -18,12 +18,14 @@ classifiers = [
     "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.0", 
     "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Logging",
@@ -41,6 +43,7 @@ dev = [
     "pytest-django>=4.5",
     "pytest-cov",
     "pytest-mock",
+    "tox-uv>=1.27.0",
     "factory-boy",
     "freezegun",
     "black>=23.0",
@@ -87,14 +90,6 @@ profile = "black"
 line_length = 100
 known_django = "django"
 sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-
-[tool.mypy]
-python_version = "3.12"
-check_untyped_defs = true
-ignore_missing_imports = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_unused_configs = true
 
 [tool.pytest.ini_options]
 addopts = """\

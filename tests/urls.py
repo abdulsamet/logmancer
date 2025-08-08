@@ -2,8 +2,8 @@
 URL configuration for logmancer tests.
 """
 
+from django.http import HttpResponse, JsonResponse
 from django.urls import path
-from django.http import JsonResponse, HttpResponse
 
 
 def dummy_view(request):

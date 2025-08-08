@@ -1,14 +1,26 @@
 .. image:: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml/badge.svg?branch=main
-   :target: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml
-   :alt: Test Status
+    :target: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml
+    :alt: Test Status
+
+.. image:: https://badge.fury.io/py/django-logmancer.svg
+    :target: https://badge.fury.io/py/django-logmancer
+    :alt: PyPI Version
 
 .. image:: https://img.shields.io/pypi/pyversions/django-logmancer.svg
-   :target: https://pypi.org/project/django-logmancer/
-   :alt: Python Versions
+    :target: https://pypi.org/project/django-logmancer/
+    :alt: Python Versions
 
 .. image:: https://img.shields.io/github/license/abdulsamet/logmancer.svg
-   :target: https://github.com/abdulsamet/logmancer/blob/main/LICENSE
-   :alt: License
+    :target: https://github.com/abdulsamet/logmancer/blob/main/LICENSE
+    :alt: License
+
+.. image:: https://codecov.io/github/abdulsamet/logmancer/graph/badge.svg?token=D45NERJMAI 
+    :target: https://codecov.io/github/abdulsamet/logmancer
+    :alt: Code Coverage
+
+.. image:: https://img.shields.io/badge/code%20style-black-000000.svg
+    :target: https://github.com/psf/black
+    :alt: Black
 
 Logmancer
 =========

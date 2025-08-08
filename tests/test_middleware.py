@@ -1,16 +1,15 @@
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
 from django.http import HttpResponse
-from django.test import Client, override_settings, RequestFactory, TransactionTestCase
+from django.test import Client, RequestFactory, TransactionTestCase, override_settings
 
 import pytest
 
-from logmancer.models import LogEntry
 from logmancer.middleware import DBLoggingMiddleware
+from logmancer.models import LogEntry
 from tests.urls import test_urlpatterns
-
 
 # Common settings for middleware tests
 MIDDLEWARE_TEST_SETTINGS = {
@@ -54,9 +53,7 @@ class BaseMiddlewareTest:
         def execute_immediately(func):
             func()
 
-        return patch(
-            "logmancer.utils.transaction.on_commit", side_effect=execute_immediately
-        )
+        return patch("logmancer.utils.transaction.on_commit", side_effect=execute_immediately)
 
 
 @pytest.mark.django_db
@@ -98,9 +95,7 @@ class TestDBLoggingMiddleware(BaseMiddlewareTest):
             new_count = LogEntry.objects.count()
             assert new_count > initial_count
 
-            log = LogEntry.objects.filter(
-                source="middleware", method="POST", path="/test/"
-            ).last()
+            log = LogEntry.objects.filter(source="middleware", method="POST", path="/test/").last()
             assert log is not None
             assert log.method == "POST"
             assert log.path == "/test/"
@@ -182,11 +177,7 @@ class TestMiddlewareExceptionHandling(BaseMiddlewareTest):
                 assert new_count > initial_count, "No exception log created"
 
                 # Verify the log content
-                log = (
-                    LogEntry.objects.filter(source="exception")
-                    .order_by("-timestamp")
-                    .first()
-                )
+                log = LogEntry.objects.filter(source="exception").order_by("-timestamp").first()
                 assert log is not None
                 assert log.level == "ERROR"
                 assert log.path == "/error/"
@@ -211,11 +202,7 @@ class TestMiddlewareExceptionHandling(BaseMiddlewareTest):
                 new_count = LogEntry.objects.filter(source="exception").count()
                 assert new_count > initial_count
 
-                log = (
-                    LogEntry.objects.filter(source="exception")
-                    .order_by("-timestamp")
-                    .first()
-                )
+                log = LogEntry.objects.filter(source="exception").order_by("-timestamp").first()
                 assert log.user == user
                 assert log.actor_type == "user"
 
@@ -252,9 +239,7 @@ class TestMiddlewareExceptionHandling(BaseMiddlewareTest):
                 with patch("logmancer.middleware.logger") as mock_logger:
                     # Should not raise exception, just log it
                     middleware.process_exception(request, exception)
-                    mock_logger.exception.assert_called_with(
-                        "[Logmancer] process_exception failed"
-                    )
+                    mock_logger.exception.assert_called_with("[Logmancer] process_exception failed")
 
 
 # Use TransactionTestCase for real transaction testing
@@ -283,11 +268,7 @@ class TestMiddlewareTransactions(TransactionTestCase, BaseMiddlewareTest):
                 )
 
                 # Find the exception log
-                log = (
-                    LogEntry.objects.filter(source="exception")
-                    .order_by("-timestamp")
-                    .first()
-                )
+                log = LogEntry.objects.filter(source="exception").order_by("-timestamp").first()
                 self.assertIsNotNone(log)
                 self.assertEqual(log.level, "ERROR")
                 self.assertEqual(log.path, "/error/")
@@ -324,16 +305,12 @@ class TestMiddlewareTransactions(TransactionTestCase, BaseMiddlewareTest):
                     self.assertIsNotNone(middleware_log)
 
                     # Then test exception logging
-                    initial_exception_count = LogEntry.objects.filter(
-                        source="exception"
-                    ).count()
+                    initial_exception_count = LogEntry.objects.filter(source="exception").count()
 
                     with self.assertRaises(ValueError):
                         response = client.get("/error/")
 
-                    new_exception_count = LogEntry.objects.filter(
-                        source="exception"
-                    ).count()
+                    new_exception_count = LogEntry.objects.filter(source="exception").count()
                     self.assertGreater(new_exception_count, initial_exception_count)
 
                     exception_log = LogEntry.objects.filter(

@@ -1,0 +1,62 @@
+name: 🐞 Bug Report
+description: Report an unexpected behavior or error in Logmancer.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the issue clearly. What did you expect, and what actually happened?
+      placeholder: Log entries are missing when submitting a form...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Logmancer version
+      placeholder: e.g., v0.3.0
+    validations:
+      required: true
+
+  - type: input
+    id: django
+    attributes:
+      label: Django version
+      placeholder: e.g., 5.2.4
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: e.g., 3.12.1
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Add the middleware
+        2. Make a POST request to /admin/
+        3. Observe missing logs
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Any error output or logs?
+      placeholder: Copy-paste traceback or log output here
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected Module
+      options:
+        - Middleware
+        - Signals
+        - Commands
+        - Configuration
+        - Admin
+        - Other

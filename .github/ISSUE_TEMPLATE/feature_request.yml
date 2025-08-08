@@ -1,0 +1,39 @@
+name: ✨ Feature Request
+description: Suggest an idea or improvement for Logmancer
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem description
+      description: What problem does this feature solve?
+      placeholder: I want to filter logs in the admin by user...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested solution
+      description: Describe the feature or enhancement you propose.
+      placeholder: Add `user` filter to the LogEntry admin.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Using external logging services, but it would be better integrated.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Affected area(s)
+      multiple: true
+      options:
+        - Middleware
+        - Signals
+        - Commands
+        - Admin
+        - Models
+        - Documentation
+        - Other

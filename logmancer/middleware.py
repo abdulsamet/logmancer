@@ -1,5 +1,7 @@
+import contextvars
 import json
 import logging
+import threading
 import traceback
 
 from logmancer.conf import get_bool, should_exclude_path
@@ -8,14 +10,41 @@ from logmancer.utils import LogEvent, make_json_safe, mask_sensitive_data
 
 logger = logging.getLogger("logmancer.middleware")
 
+# Sync (thread local) and async (contextvar) storage
+_thread_user = threading.local()
+_context_user = contextvars.ContextVar("current_user", default=None)
+
 
 class DBLoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        # Sync context
+        _thread_user.user = getattr(request, "user", None)
+
+        # Async context
+        _context_user.set(getattr(request, "user", None))
+
         response = self.get_response(request)
         self.log_request(request, response)
+
+        _thread_user.user = None
+        _context_user.set(None)
+
+        return response
+
+    async def __acall__(self, request):
+        # Async context
+        _thread_user.user = getattr(request, "user", None)
+        _context_user.set(getattr(request, "user", None))
+
+        response = await self.get_response(request)
+        self.log_request(request, response)
+
+        _thread_user.user = None
+        _context_user.set(None)
+
         return response
 
     def get_user_from_request(self, request):
@@ -87,3 +116,13 @@ class DBLoggingMiddleware:
             )
         except Exception:
             logger.exception("[Logmancer] process_exception failed")
+
+
+def get_current_user():
+    # Check async context
+    user = _context_user.get(None)
+    if user is not None:
+        return user
+
+    # Then check sync thread local
+    return getattr(_thread_user, "user", None)

@@ -2,7 +2,7 @@
 Logmancer - Advanced logging and monitoring for Django applications.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __author__ = "Abdulsamet TATAR"
 __email__ = "abdulsamettatar@gmail.com"
 
