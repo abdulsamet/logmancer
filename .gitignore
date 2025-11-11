@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# uv tools
+uv.lock
+
 # migrations
 migrations/
 

@@ -4,9 +4,9 @@ import logging
 import threading
 import traceback
 
-from logmancer.conf import get_bool, should_exclude_path
+from logmancer.conf import get_bool, get_list, should_exclude_path
 from logmancer.models import LogEntry
-from logmancer.utils import LogEvent, make_json_safe, mask_sensitive_data
+from logmancer.utils import LogEvent
 
 logger = logging.getLogger("logmancer.middleware")
 
@@ -26,13 +26,13 @@ class DBLoggingMiddleware:
         # Async context
         _context_user.set(getattr(request, "user", None))
 
-        response = self.get_response(request)
-        self.log_request(request, response)
-
-        _thread_user.user = None
-        _context_user.set(None)
-
-        return response
+        try:
+            response = self.get_response(request)
+            self.log_request(request, response)
+            return response
+        finally:
+            _thread_user.user = None
+            _context_user.set(None)
 
     async def __acall__(self, request):
         # Async context
@@ -46,6 +46,26 @@ class DBLoggingMiddleware:
         _context_user.set(None)
 
         return response
+
+    def mask_sensitive_data(self, data):
+        if not isinstance(data, (dict, list)):
+            return data
+
+        sensitive_keys = [k.lower() for k in get_list("LOG_SENSITIVE_KEYS")]
+
+        if isinstance(data, list):
+            return [self.mask_sensitive_data(item) for item in data]
+
+        masked = {}
+        for key, value in data.items():
+            if key.lower() in sensitive_keys:
+                masked[key] = "****"
+            elif isinstance(value, (dict, list)):
+                masked[key] = self.mask_sensitive_data(value)
+            else:
+                masked[key] = value
+
+        return masked
 
     def get_user_from_request(self, request):
         if hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
@@ -66,16 +86,14 @@ class DBLoggingMiddleware:
             except Exception:
                 body_data = {}
 
-            meta = make_json_safe(
-                {
-                    "GET": mask_sensitive_data(request.GET.dict()),
-                    "POST": mask_sensitive_data(body_data),
-                    "headers": mask_sensitive_data(
-                        {k: v for k, v in request.headers.items() if k.lower() != "authorization"}
-                    ),
-                    "remote_addr": request.META.get("REMOTE_ADDR"),
-                }
-            )
+            meta = {
+                "GET": self.mask_sensitive_data(request.GET.dict()),
+                "POST": self.mask_sensitive_data(body_data),
+                "headers": self.mask_sensitive_data(
+                    {k: v for k, v in request.headers.items() if k.lower() != "authorization"}
+                ),
+                "remote_addr": request.META.get("REMOTE_ADDR"),
+            }
 
             LogEntry.objects.create(
                 level="INFO",
@@ -88,8 +106,8 @@ class DBLoggingMiddleware:
                 source="middleware",
                 actor_type="user" if user else "system",
             )
-        except Exception:
-            logger.exception("[Logmancer] Middleware log error")
+        except Exception as e:
+            logger.exception(f"Middleware log error: {e}")
 
     def process_exception(self, request, exception):
         if not get_bool("AUTO_LOG_EXCEPTIONS"):
@@ -114,8 +132,8 @@ class DBLoggingMiddleware:
                 source="exception",
                 actor_type="user" if user else "system",
             )
-        except Exception:
-            logger.exception("[Logmancer] process_exception failed")
+        except Exception as e:
+            logger.exception(f"Process_exception failed: {e}")
 
 
 def get_current_user():

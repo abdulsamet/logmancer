@@ -239,7 +239,7 @@ class TestMiddlewareExceptionHandling(BaseMiddlewareTest):
                 with patch("logmancer.middleware.logger") as mock_logger:
                     # Should not raise exception, just log it
                     middleware.process_exception(request, exception)
-                    mock_logger.exception.assert_called_with("[Logmancer] process_exception failed")
+                    mock_logger.exception.assert_called_with("Process_exception failed: Log Error")
 
 
 # Use TransactionTestCase for real transaction testing
@@ -347,6 +347,137 @@ class TestMiddlewareDirect(BaseMiddlewareTest):
 
 
 # Alternative test using synchronous logging
+@pytest.mark.django_db
+class TestMiddlewareAsync(BaseMiddlewareTest):
+    """Test async middleware functionality"""
+
+    @pytest.mark.asyncio
+    async def test_async_call_basic(self):
+        """Test async __acall__ method"""
+
+        async def async_response(request):
+            return HttpResponse("OK")
+
+        middleware = DBLoggingMiddleware(async_response)
+        request = RequestFactory().get("/test/")
+        request.user = None
+
+        with patch.object(middleware, "log_request"):
+            response = await middleware.__acall__(request)
+            assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_async_call_with_user(self):
+        """Test async __acall__ with authenticated user"""
+        import uuid
+
+        from asgiref.sync import sync_to_async
+
+        from logmancer.middleware import get_current_user
+
+        username = f"async_user_{uuid.uuid4().hex[:8]}"
+        user = await sync_to_async(User.objects.create_user)(username=username)
+
+        async def async_response(request):
+            # Check user is set in context
+            current = get_current_user()
+            assert current == user
+            return HttpResponse("OK")
+
+        middleware = DBLoggingMiddleware(async_response)
+        request = RequestFactory().get("/test/")
+        request.user = user
+
+        with patch.object(middleware, "log_request"):
+            response = await middleware.__acall__(request)
+            assert response.status_code == 200
+
+        # Check user is cleaned up
+        assert get_current_user() is None
+
+
+@pytest.mark.django_db
+class TestMiddlewareMasking(BaseMiddlewareTest):
+    """Test sensitive data masking"""
+
+    def test_mask_list_data(self):
+        """Test masking sensitive data in lists"""
+        middleware = DBLoggingMiddleware(lambda x: x)
+
+        data = [
+            {"password": "secret123", "name": "John"},
+            {"token": "abc123", "email": "test@example.com"},
+        ]
+
+        with patch("logmancer.middleware.get_list", return_value=["password", "token"]):
+            masked = middleware.mask_sensitive_data(data)
+            assert masked[0]["password"] == "****"
+            assert masked[1]["token"] == "****"
+            assert masked[0]["name"] == "John"
+
+    def test_mask_non_dict_list(self):
+        """Test masking with non-dict/list data"""
+        middleware = DBLoggingMiddleware(lambda x: x)
+
+        assert middleware.mask_sensitive_data("string") == "string"
+        assert middleware.mask_sensitive_data(123) == 123
+        assert middleware.mask_sensitive_data(None) is None
+
+
+@pytest.mark.django_db
+class TestMiddlewareJSONParsing(BaseMiddlewareTest):
+    """Test JSON body parsing"""
+
+    def test_log_request_json_body(self):
+        """Test logging with JSON body"""
+        middleware = DBLoggingMiddleware(lambda x: HttpResponse())
+
+        request = RequestFactory().post(
+            "/api/test/", data=json.dumps({"key": "value"}), content_type="application/json"
+        )
+        request.user = None
+        response = HttpResponse(status=200)
+
+        with patch("logmancer.middleware.should_exclude_path", return_value=False):
+            middleware.log_request(request, response)
+
+        log = LogEntry.objects.filter(path="/api/test/").first()
+        assert log is not None
+        assert log.meta["POST"] == {"key": "value"}
+
+    def test_log_request_invalid_json(self):
+        """Test logging with invalid JSON body"""
+        middleware = DBLoggingMiddleware(lambda x: HttpResponse())
+
+        request = RequestFactory().post(
+            "/api/test/", data="invalid json", content_type="application/json"
+        )
+        request.user = None
+        response = HttpResponse(status=200)
+
+        with patch("logmancer.middleware.should_exclude_path", return_value=False):
+            middleware.log_request(request, response)
+
+        log = LogEntry.objects.filter(path="/api/test/").first()
+        assert log is not None
+        assert log.meta["POST"] == {}
+
+    def test_log_request_with_exception_in_logging(self):
+        """Test logging handles internal errors gracefully"""
+        middleware = DBLoggingMiddleware(lambda x: HttpResponse())
+
+        request = RequestFactory().get("/test/")
+        request.user = None
+        response = HttpResponse(status=200)
+
+        with patch("logmancer.middleware.should_exclude_path", return_value=False):
+            with patch(
+                "logmancer.middleware.LogEntry.objects.create", side_effect=Exception("DB error")
+            ):
+                # Should not raise exception
+                middleware.log_request(request, response)
+
+
 @pytest.mark.django_db
 class TestMiddlewareSynchronous(BaseMiddlewareTest):
     """Test middleware with synchronous logging (no transaction.on_commit)"""

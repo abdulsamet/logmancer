@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.test import override_settings
 
 import pytest
 
@@ -49,3 +50,48 @@ def test_log_event_with_actor():
     assert entry is not None
     assert entry.actor_type == "user"
     assert entry.level == "WARNING"
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(LOGMANCER={"ENABLE_NOTIFICATIONS": True})
+def test_log_event_notify_true_triggers_queue(monkeypatch):
+    queued = {}
+
+    def fake_queue(cls, log_entry, context):
+        queued["called"] = True
+        queued["log_entry"] = log_entry
+        queued["context"] = context
+
+    monkeypatch.setattr(LogEvent, "_queue_notification", classmethod(fake_queue))
+
+    with transaction.atomic():
+        LogEvent.error(
+            "Notify me",
+            notify=True,
+            meta={"key": "value"},
+            source="test",
+        )
+        transaction.on_commit(lambda: None)
+
+    assert queued.get("called") is True
+    assert queued["log_entry"].message == "Notify me"
+    assert queued["context"]["meta"] == {"key": "value"}
+    assert queued["context"]["source"] == "test"
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(LOGMANCER={"ENABLE_NOTIFICATIONS": False})
+def test_log_event_notify_true_respects_disabled_setting(monkeypatch):
+    was_called = False
+
+    def fake_queue(cls, log_entry, context):
+        nonlocal was_called
+        was_called = True
+
+    monkeypatch.setattr(LogEvent, "_queue_notification", classmethod(fake_queue))
+
+    with transaction.atomic():
+        LogEvent.error("Do not notify", notify=True)
+        transaction.on_commit(lambda: None)
+
+    assert was_called is False

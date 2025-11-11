@@ -1,116 +1,121 @@
-import datetime
-import json
-from decimal import Decimal
-from uuid import UUID
+import asyncio
+import logging
+import queue
+from concurrent.futures import ThreadPoolExecutor
+from threading import Thread
 
 from django.db import transaction
 
-from logmancer.conf import get_list
+from logmancer.conf import get_bool
 from logmancer.models import LogEntry
+from logmancer.notifications.manager import notification_manager
 
-
-def make_json_safe(data):
-    """
-    Converts datetime, Decimal, and UUID objects in data to strings before writing to JSONField.
-    """
-
-    def default_serializer(obj):
-        if isinstance(obj, (datetime.datetime, datetime.date)):
-            return obj.isoformat()
-        elif isinstance(obj, Decimal):
-            return float(obj)
-        elif isinstance(obj, UUID):
-            return str(obj)
-        return str(obj)
-
-    try:
-        json_str = json.dumps(data, default=default_serializer)
-        return json.loads(json_str)
-    except Exception as e:
-        print(f"[Logmancer] make_json_safe failed: {e}")
-        return {}
-
-
-def mask_sensitive_data(data):
-    """
-    Returns data with sensitive keys masked.
-    """
-    if not isinstance(data, (dict, list)):
-        return data
-
-    sensitive_keys = [k.lower() for k in get_list("LOG_SENSITIVE_KEYS")]
-
-    if isinstance(data, list):
-        return [mask_sensitive_data(item) for item in data]
-
-    masked = {}
-    for key, value in data.items():
-        if key.lower() in sensitive_keys:
-            masked[key] = "****"
-        elif isinstance(value, (dict, list)):
-            masked[key] = mask_sensitive_data(value)
-        else:
-            masked[key] = value
-
-    return masked
+logger = logging.getLogger("logmancer.utils")
 
 
 class LogEvent:
-    @staticmethod
-    def _log(message, level="INFO", **kwargs):
-        user = kwargs.get("user")
-        meta = kwargs.get("meta")
-        path = kwargs.get("path")
-        method = kwargs.get("method")
-        status_code = kwargs.get("status_code")
-        source = kwargs.get("source", "manual")
-        actor_type = kwargs.get("actor_type")
-        if actor_type is None:
-            actor_type = "user" if user else "system"
-        clean_meta = make_json_safe(mask_sensitive_data(meta or {}))
+    _notification_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="logmancer_notif")
+    _notification_queue = queue.Queue(maxsize=1000)
+    _worker_started = False
 
-        def _write_log():
+    @classmethod
+    def _log(cls, level, message, **kwargs):
+        """Internal log method with notification support"""
+
+        def create_log():
             try:
-                LogEntry.objects.create(
+                log_entry = LogEntry.objects.create(
                     message=message,
-                    level=level.upper(),
-                    user=user,
-                    meta=clean_meta,
-                    path=path,
-                    method=method,
-                    status_code=status_code,
-                    source=source,
-                    actor_type=actor_type,
+                    level=level,
+                    source=kwargs.get("source", "manual"),
+                    path=kwargs.get("path"),
+                    method=kwargs.get("method"),
+                    status_code=kwargs.get("status_code"),
+                    meta=kwargs.get("meta", {}),
+                    user=kwargs.get("user"),
+                    actor_type=kwargs.get("actor_type", "user"),
                 )
-            except Exception as e:
-                print(f"[Logmancer] LogEvent raised an error: {e}")
 
-        transaction.on_commit(_write_log)
+                notify = kwargs.pop("notify", False)
+                enabled = get_bool("ENABLE_NOTIFICATIONS")
+
+                if notify and enabled:
+                    cls._queue_notification(log_entry, kwargs)
+
+                return log_entry
+            except Exception as e:
+                logger.error(f"LogEvent _log error: {e}")
+
+        transaction.on_commit(create_log)
+
+    @classmethod
+    def _queue_notification(cls, log_entry, context):
+        """Queue notification for async processing"""
+        try:
+            cls._notification_queue.put_nowait((log_entry, context))
+
+            if not cls._worker_started:
+                cls._start_notification_worker()
+                cls._worker_started = True
+
+        except queue.Full:
+            logger.error("Notification queue is full, dropping notification")
+
+    @classmethod
+    def _start_notification_worker(cls):
+        """Start background worker for processing notifications"""
+
+        def notification_worker():
+            while True:
+                try:
+                    log_entry, context = cls._notification_queue.get(timeout=30)
+
+                    cls._notification_executor.submit(
+                        cls._send_notification_async, log_entry, context
+                    )
+
+                    cls._notification_queue.task_done()
+
+                except queue.Empty:
+                    continue
+                except Exception as e:
+                    logger.error(f"Notification worker error: {e}")
+
+        worker_thread = Thread(target=notification_worker, daemon=True, name="logmancer_worker")
+        worker_thread.start()
+
+    @classmethod
+    def _send_notification_async(cls, log_entry, context):
+        """Run async notifications inside this worker thread"""
+        try:
+            asyncio.run(notification_manager.send_notifications(log_entry, context))
+        except Exception as e:
+            logger.error(f"Sending notification failed: {e}")
 
     @classmethod
     def info(cls, message, **kwargs):
-        cls._log(message, level="INFO", **kwargs)
+        cls._log("INFO", message, **kwargs)
 
     @classmethod
     def warning(cls, message, **kwargs):
-        cls._log(message, level="WARNING", **kwargs)
+        cls._log("WARNING", message, **kwargs)
 
     @classmethod
     def error(cls, message, **kwargs):
-        cls._log(message, level="ERROR", **kwargs)
+        cls._log("ERROR", message, **kwargs)
 
     @classmethod
     def debug(cls, message, **kwargs):
-        cls._log(message, level="DEBUG", **kwargs)
+        cls._log("DEBUG", message, **kwargs)
 
     @classmethod
     def critical(cls, message, **kwargs):
-        cls._log(message, level="CRITICAL", **kwargs)
+        cls._log("CRITICAL", message, **kwargs)
 
     @classmethod
     def fatal(cls, message, **kwargs):
-        cls._log(message, level="FATAL", **kwargs)
+        cls._log("FATAL", message, **kwargs)
 
     @classmethod
     def notset(cls, message, **kwargs):
-        cls._log(message, level="NOTSET", **kwargs)
+        cls._log("NOTSET", message, **kwargs)

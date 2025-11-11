@@ -1,5 +1,3 @@
-import warnings
-
 from django.conf import settings
 
 DEFAULTS = {
@@ -8,34 +6,51 @@ DEFAULTS = {
     "AUTO_LOG_EXCEPTIONS": False,
     "CLEANUP_AFTER_DAYS": 30,
     "SIGNAL_EXCLUDE_MODELS": ["logmancer.LogEntry", "admin.LogEntry"],
+    "PATH_EXCLUDE_PREFIXES": [],
     "DEFAULT_LOG_LEVEL": "INFO",
+    "NOTIFICATIONS": {},
+    "ENABLE_NOTIFICATIONS": False,
 }
 
 
 def get(key):
-    full_key = f"LOGMANCER_{key}"
-    if hasattr(settings, full_key):
-        return getattr(settings, full_key)
+    """Get value from LOGMANCER settings"""
+    logmancer_settings = getattr(settings, "LOGMANCER", {})
+    if key in logmancer_settings:
+        return logmancer_settings[key]
     return DEFAULTS.get(key)
 
 
 def get_list(key):
+    """Get list value from LOGMANCER settings"""
     val = get(key)
     if isinstance(val, (list, tuple)):
         return list(val)
     return []
 
 
+def get_dict(key):
+    """Get dictionary value from LOGMANCER settings"""
+    val = get(key)
+    if isinstance(val, dict):
+        return val
+    return DEFAULTS.get(key, {})
+
+
 def get_bool(key):
-    return bool(get(key))
+    """Get boolean value from LOGMANCER settings"""
+    val = get(key)
+    if isinstance(val, bool):
+        return val
+    return DEFAULTS.get(key)
 
 
 def get_int(key):
-    try:
-        return int(get(key))
-    except (ValueError, TypeError):
-        warnings.warn(f"[Logmancer] LOGMANCER_{key} value is not integer.")
-        return DEFAULTS.get(key, 0)
+    """Get integer value from LOGMANCER settings"""
+    val = get(key)
+    if isinstance(val, int):
+        return val
+    return DEFAULTS.get(key, 0)
 
 
 def should_exclude_model(model):
