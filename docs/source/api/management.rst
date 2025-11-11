@@ -174,12 +174,14 @@ Test the command in your project:
 Related Settings
 ^^^^^^^^^^^^^^^^
 
-- :ref:`CLEANUP_AFTER_DAYS <config-cleanup-after-days>`
-- :ref:`ENABLE_MIDDLEWARE <config-enable-middleware>`
+See :doc:`/configuration` for full configuration reference:
+
+* ``CLEANUP_AFTER_DAYS`` - Default retention period
+* ``ENABLE_MIDDLEWARE`` - Enable HTTP request logging
 
 See Also
 ^^^^^^^^
 
-- :doc:`/guides/cleanup-strategy` - Best practices for log retention
-- :doc:`/configuration` - Full configuration reference
-- :doc:`/api/models` - LogEntry model documentation
+* :doc:`/guides/cleanup-strategy` - Best practices for log retention
+* :doc:`/configuration` - Full configuration reference
+* :doc:`/api/models` - LogEntry model documentation
