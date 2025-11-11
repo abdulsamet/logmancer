@@ -425,9 +425,18 @@ class TestLogLevelEdgeCases:
 
     def test_enum_membership(self):
         """Test enum membership"""
+        import sys
+        
         assert LogLevel.DEBUG in LogLevel
         assert LogLevel.ERROR in LogLevel
-        assert "DEBUG" not in LogLevel  # String is not a member
+        
+        # Python 3.11 and earlier: string in enum raises TypeError
+        # Python 3.12+: string in enum returns False
+        if sys.version_info >= (3, 12):
+            assert "DEBUG" not in LogLevel  # String is not a member
+        else:
+            with pytest.raises(TypeError):
+                "DEBUG" in LogLevel
 
     def test_level_immutability(self):
         """Test enum values cannot be changed"""
