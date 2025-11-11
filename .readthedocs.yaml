@@ -6,7 +6,7 @@ build:
     python: "3.12"
   jobs:
     post_install:
-      - pip install uv
+      - pip install uv sphinx-rtd-theme
       - uv sync --group docs
 
 sphinx:
