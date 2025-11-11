@@ -2,8 +2,8 @@
     :target: https://github.com/abdulsamet/logmancer/actions/workflows/test.yml
     :alt: Test Status
 
-.. image:: https://badge.fury.io/py/django-logmancer.svg
-    :target: https://badge.fury.io/py/django-logmancer
+.. image:: https://badge.fury.io/gh/abdulsamet%2Flogmancer.svg
+    :target: https://badge.fury.io/gh/abdulsamet%2Flogmancer
     :alt: PyPI Version
 
 .. image:: https://img.shields.io/pypi/pyversions/django-logmancer.svg
